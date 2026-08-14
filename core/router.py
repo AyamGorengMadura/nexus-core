@@ -1,6 +1,10 @@
 import requests
 import json
 import redis
+from core.contextual_module import build_context_prompt, log_interaction, get_person_by_embedding
+
+r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "qwen2.5:3b"
 
@@ -16,7 +20,11 @@ Balas HANYA dengan JSON, format:
 
 Kalau confidence di bawah 0.6, tetap pilih "chat" sebagai fallback aman.
 """
-r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+
+# MOCK — sementara sampai Lazarus Guard beneran nyambung di Phase 4.
+# Nanti diganti: person_id didapat dari embedding_id hasil face verification.
+MOCK_PERSON_ID = 1
+
 
 def classify_intent(user_text: str) -> dict:
     payload = {
@@ -31,13 +39,10 @@ def classify_intent(user_text: str) -> dict:
         resp.raise_for_status()
         raw = resp.json()["response"]
         result = json.loads(raw)
-
-        # fallback guard kalau confidence rendah
         if result.get("confidence", 0) < 0.6:
             result["intent"] = "chat"
         return result
     except Exception as e:
-        # fallback total kalau Ollama gagal / response gak valid
         return {"intent": "chat", "confidence": 0.0, "error": str(e)}
 
 
@@ -45,33 +50,28 @@ def route(user_text: str) -> str:
     classification = classify_intent(user_text)
     intent = classification["intent"]
 
-    # publish event ke channel sesuai intent
+    # publish event ke Redis (tetap jalan seperti sebelumnya)
     event = {"text": user_text, "confidence": classification.get("confidence", 0)}
     r.publish(f"event:{intent}", str(event))
 
-    if intent == "chat":
-        return f"[chat] (belum nyambung ke Cyrene Framework) — kamu bilang: {user_text}"
-    elif intent == "face_query":
-        return "[face_query] event dipublish ke Redis, nunggu Lazarus Guard"
-    elif intent == "document":
-        return "[document] event dipublish ke Redis, nunggu Document Reader"
-    elif intent == "system":
-        return "[system] event dipublish ke Redis, belum ada handler"
-    else:
-        return f"[unknown intent: {intent}]"
-    """Entry point utama. Nanti ini yang manggil satelit sesuai intent."""
-    classification = classify_intent(user_text)
-    print(f"[DEBUG] intent={classification}")  # sementara, buat verifikasi
-    intent = classification["intent"]
+    # ambil context dari Contextual Module (Phase 2)
+    context_prompt = build_context_prompt(MOCK_PERSON_ID)
 
-    # Placeholder — nanti tiap intent manggil modul/satelit beneran
+    # log interaksi ini
+    log_interaction(MOCK_PERSON_ID, f"[{intent}] {user_text}")
+
+    # placeholder response — nanti Phase 3 ini yang dikirim ke Cyrene Framework
+    # buat di-narasikan, bukan di-print mentah kayak sekarang
     if intent == "chat":
-        return f"[chat] (belum nyambung ke Cyrene Framework) — kamu bilang: {user_text}"
+        return (
+            f"[chat] event dipublish, context terpasang "
+            f"(belum nyambung ke Cyrene Framework)\n--- context preview ---\n{context_prompt}"
+        )
     elif intent == "face_query":
-        return "[face_query] (belum nyambung ke Lazarus Guard)"
+        return "[face_query] event dipublish, nunggu Lazarus Guard (Phase 4)"
     elif intent == "document":
-        return "[document] (belum nyambung ke Document Reader)"
+        return "[document] event dipublish, nunggu Document Reader"
     elif intent == "system":
-        return "[system] (belum ada command handler)"
+        return "[system] event dipublish, belum ada handler"
     else:
         return f"[unknown intent: {intent}]"
