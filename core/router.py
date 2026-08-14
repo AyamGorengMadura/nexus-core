@@ -2,6 +2,7 @@ import requests
 import json
 import redis
 from core.contextual_module import build_context_prompt, log_interaction, get_person_by_embedding
+from core.cyrene_framework import narrate
 
 r = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
@@ -21,10 +22,23 @@ Balas HANYA dengan JSON, format:
 Kalau confidence di bawah 0.6, tetap pilih "chat" sebagai fallback aman.
 """
 
-# MOCK — sementara sampai Lazarus Guard beneran nyambung di Phase 4.
-# Nanti diganti: person_id didapat dari embedding_id hasil face verification.
-MOCK_PERSON_ID = 1
+CYRENE_PERSONA = """Kamu adalah Cyrene — teman ngobrol yang santai dan hangat.
 
+Contoh respons yang BENAR:
+User: "haloo cyrene"
+Cyrene: "Halo! Lagi apa nih? Btw kemarin lo nanya soal jadwal kelas besok, udah nemu belum?"
+
+User: "capek banget hari ini"
+Cyrene: "Wah capek ya. Cerita dong kenapa, siapa tau abis cerita jadi agak lega."
+
+Contoh respons yang SALAH (jangan pernah kayak gini):
+"Halo! Senang berbicara denganmu. Bagaimana saya bisa membantu?"
+"Baik, saya akan membantu Anda dengan hal tersebut."
+
+Ingat: kamu bukan customer service. Kamu temen. Ngobrol natural, boleh santai, boleh pake bahasa gaul secukupnya.
+"""
+
+MOCK_PERSON_ID = 1
 
 def classify_intent(user_text: str) -> dict:
     payload = {
@@ -44,7 +58,6 @@ def classify_intent(user_text: str) -> dict:
         return result
     except Exception as e:
         return {"intent": "chat", "confidence": 0.0, "error": str(e)}
-
 
 def route(user_text: str) -> str:
     classification = classify_intent(user_text)
@@ -67,6 +80,28 @@ def route(user_text: str) -> str:
             f"[chat] event dipublish, context terpasang "
             f"(belum nyambung ke Cyrene Framework)\n--- context preview ---\n{context_prompt}"
         )
+    elif intent == "face_query":
+        return "[face_query] event dipublish, nunggu Lazarus Guard (Phase 4)"
+    elif intent == "document":
+        return "[document] event dipublish, nunggu Document Reader"
+    elif intent == "system":
+        return "[system] event dipublish, belum ada handler"
+    else:
+        return f"[unknown intent: {intent}]"
+
+def route(user_text: str) -> str:
+    classification = classify_intent(user_text)
+    intent = classification["intent"]
+
+    event = {"text": user_text, "confidence": classification.get("confidence", 0)}
+    r.publish(f"event:{intent}", str(event))
+
+    context_prompt = build_context_prompt(MOCK_PERSON_ID)
+    log_interaction(MOCK_PERSON_ID, f"[{intent}] {user_text}")
+
+    if intent == "chat":
+        response = narrate(context_prompt, user_text)
+        return response["text"]  # nanti interface yang urus expression/motion
     elif intent == "face_query":
         return "[face_query] event dipublish, nunggu Lazarus Guard (Phase 4)"
     elif intent == "document":
