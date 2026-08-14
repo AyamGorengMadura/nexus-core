@@ -5,11 +5,23 @@ Bagian dari ekosistem: [nexus-docs](../nexus-docs) (arsitektur),
 [cyrene](../cyrene) (conversational framework), 
 [lazarus-guard](../lazarus-guard) (face verification satellite).
 
-## Status: Phase 1 — Core Orchestrator & Event Bus ✅
+## Status
 
-- [x] SLM Router (Ollama/Qwen 2.5 3B) — klasifikasi intent
-- [x] Redis Event Bus — publish event per intent
-- [ ] Phase 2: Context Engine & Contextual Module
+- [x] Phase 1 — Core Orchestrator & Event Bus
+  - [x] SLM Router (Ollama/Qwen 2.5 3B) — klasifikasi intent
+  - [x] Redis Event Bus — publish event per intent
+- [x] Phase 2 — Context Engine & Contextual Module
+  - [x] PostgreSQL + pgvector — skema `persons`, `interaction_logs`
+  - [x] Trust tier enforcement (owner-only, `set_trust_tier`)
+  - [x] Context Injection Pipeline (`build_context_prompt`)
+  - [x] Wired ke router.py (mock `person_id` — nunggu Lazarus Guard di Phase 4)
+- [ ] Phase 3 — Cyrene Framework & Cyrene L2D (WIP)
+  - [x] Narration Layer (text) — Qwen 2.5 3B, context-aware
+  - [x] Wired ke router.py — placeholder chat diganti respons LLM beneran
+  - [ ] Persona tuning — masih agak formal, kandidat improvement: model lebih besar / LoRA
+  - [ ] Emotion tags (expression/motion) — output ada, belum ada consumer
+  - [ ] Cyrene L2D — belum dibangun sama sekali
+- [ ] Phase 4 — Lazarus Guard & Telegram Alert
 
 ## Setup
 \`\`\`bash
