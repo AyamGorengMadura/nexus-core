@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # nexus-core
 
 Core Orchestrator & Router untuk sistem Nexus/Dozor.
@@ -26,3 +27,7 @@ interfaces/    # Adapter I/O — CLI sekarang, L2D nanti
 \`\`\`
 
 Lihat [nexus-docs](../nexus-docs) untuk blueprint arsitektur lengkap.
+||||||| empty tree
+=======
+# Nexus Core\nOrchestration layer for Project Nexus: Dozor.
+>>>>>>> 6736d2306b2e6ba5c448003f1701e302a2754120
