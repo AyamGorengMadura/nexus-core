@@ -15,7 +15,12 @@ Bagian dari ekosistem: [nexus-docs](../nexus-docs) (arsitektur),
   - [x] Trust tier enforcement (owner-only, `set_trust_tier`)
   - [x] Context Injection Pipeline (`build_context_prompt`)
   - [x] Wired ke router.py (mock `person_id` — nunggu Lazarus Guard di Phase 4)
-- [ ] Phase 3 — Cyrene Framework & Cyrene L2D
+- [ ] Phase 3 — Cyrene Framework & Cyrene L2D (WIP)
+  - [x] Narration Layer (text) — Qwen 2.5 3B, context-aware
+  - [x] Wired ke router.py — placeholder chat diganti respons LLM beneran
+  - [ ] Persona tuning — masih agak formal, kandidat improvement: model lebih besar / LoRA
+  - [ ] Emotion tags (expression/motion) — output ada, belum ada consumer
+  - [ ] Cyrene L2D — belum dibangun sama sekali
 - [ ] Phase 4 — Lazarus Guard & Telegram Alert
 
 ## Setup
