@@ -17,8 +17,9 @@ Bagian dari ekosistem: [nexus-docs](../nexus-docs) (arsitektur),
   - [x] Wired ke router.py (mock `person_id` — nunggu Lazarus Guard di Phase 4)
 - [ ] Phase 3 — Cyrene Framework & Cyrene L2D (WIP)
   - [x] Narration Layer (text) — Qwen 2.5 3B, context-aware
-  - [x] Wired ke router.py — placeholder chat diganti respons LLM beneran
-  - [ ] Persona tuning — masih agak formal, kandidat improvement: model lebih besar / LoRA
+  - [x] Fact Layer — deterministic fact injection per-intent (identity/trust_tier), narrator no longer guesses facts from prompt
+  - [x] Router intent classification refined (face_query vs system disambiguation)
+  - [ ] Persona/reasoning quality — single-fact questions still occasionally evasive; conversational hallucination observed (likely 3B ceiling, exploring narrator model upgrade)
   - [ ] Emotion tags (expression/motion) — output ada, belum ada consumer
   - [ ] Cyrene L2D — belum dibangun sama sekali
 - [ ] Phase 4 — Lazarus Guard & Telegram Alert
