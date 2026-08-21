@@ -14,7 +14,7 @@ from core.cyrene_framework import narrate
 r = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-ROUTER_MODEL = "qwen2.5:3b"
+MODEL = "qwen2.5:3b"
 
 INTENT_SYSTEM_PROMPT = """Kamu adalah router intent untuk sistem Nexus/Dozor.
 Klasifikasikan input user ke salah satu intent berikut:
