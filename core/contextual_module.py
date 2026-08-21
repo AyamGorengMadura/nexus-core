@@ -1,6 +1,6 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
-
+from pymupdf import name
 DB_CONFIG = {
     "host": "localhost",
     "port": 5432,
@@ -109,13 +109,17 @@ def build_context_prompt(person_id: int) -> str:
         for i in interactions
     ) if interactions else "Belum ada riwayat interaksi."
 
+    # di contextual_module.py, ganti baris terakhir prompt:
     prompt = f"""Kamu adalah Cyrene, asisten AI yang sedang berbicara dengan: {name}
-Trust tier orang ini: {tier}
-Aturan perilaku: {rule}
+    Trust tier orang ini: {tier}
+    Aturan perilaku: {rule}
 
-Riwayat interaksi terakhir:
-{history_text}
+    Riwayat interaksi terakhir:
+    {history_text}
 
-Jawab dengan natural, sesuai aturan perilaku di atas. Jangan sebutkan trust tier secara eksplisit ke orang tersebut."""
-
+    Jawab dengan natural, sesuai aturan perilaku di atas.
+    Jangan sebutkan kata "trust tier" atau level akses secara teknis ke orang tersebut.
+    Kalau ditanya soal level akses/kepercayaan, jawab secara natural sesuai konteks
+    (misal kalau owner: "Ya jelas dong, kamu kan yang bikin aku" — bukan ngarang
+    alasan kenapa belum bisa kasih tau)."""
     return prompt

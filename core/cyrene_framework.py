@@ -2,7 +2,7 @@ import requests
 import json
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "qwen2.5:3b"
+NARRATOR_MODEL = "qwen2.5:7b"
 
 CYRENE_PERSONA = """Kamu adalah Cyrene — AI companion yang hangat, natural, dan responsif.
 Kamu BUKAN asisten formal/robotik. Kamu ngobrol kayak teman yang perhatian.
@@ -10,17 +10,18 @@ Jawab singkat dan natural, jangan bertele-tele.
 """
 
 
-def narrate(context_prompt: str, user_text: str, raw_result: str = None) -> dict:
-    """
-    Narration Layer.
-    Input: context prompt (dari Contextual Module) + teks user +
-           hasil mentah dari satelit (kalau ada, misal dari Lazarus Guard nanti).
-    Output: JSON terstruktur — text + expression + motion,
-            siap dikirim ke interface (CLI sekarang, L2D nanti).
-    """
-    full_prompt = f"{context_prompt}\n\nPesan dari user: {user_text}"
-    if raw_result:
-        full_prompt += f"\n\nData tambahan dari sistem: {raw_result}"
+def narrate(context_prompt: str, user_text: str, facts: dict = None) -> dict:
+    fact_injection = ""
+    if facts:
+        lines = "\n".join(f"- {k}: {v}" for k, v in facts.items())
+        fact_injection = f"""
+FAKTA YANG SUDAH PASTI (jangan bantah, jangan ragu, jangan mengelak dengan bercanda):
+{lines}
+Kalau user menanyakan identitas/tier mereka secara langsung, JAWAB LANGSUNG
+pakai fakta di atas tanpa berputar-putar atau balik bertanya.
+"""
+
+    full_prompt = f"{context_prompt}\n{fact_injection}\n\nPesan dari user: {user_text}"
 
     payload = {
         "model": MODEL,
@@ -41,7 +42,6 @@ def narrate(context_prompt: str, user_text: str, raw_result: str = None) -> dict
         result = json.loads(raw)
         return result
     except Exception as e:
-        # fallback aman kalau LLM gagal/response gak valid JSON
         return {
             "text": "Maaf, aku lagi agak bingung nih. Bisa diulang?",
             "expression": "concerned",
