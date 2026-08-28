@@ -47,7 +47,7 @@ pakai fakta di atas tanpa berputar-putar atau balik bertanya.
     payload["prompt"] += f"\n\n{instruction}"
 
     try:
-        resp = requests.post(OLLAMA_URL, json=payload, timeout=20)
+        resp = requests.post(OLLAMA_URL, json=payload, timeout=60)
         resp.raise_for_status()
         raw = resp.json()["response"]
         result = json.loads(raw)

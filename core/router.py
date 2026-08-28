@@ -36,7 +36,7 @@ Balas HANYA dengan JSON, format:
 Kalau confidence di bawah 0.6, tetap pilih "chat" sebagai fallback aman.
 """
 
-MOCK_PERSON_ID = 1
+MOCK_PERSON_ID = 3
 
 
 def classify_intent(user_text: str) -> dict:
@@ -48,7 +48,7 @@ def classify_intent(user_text: str) -> dict:
         "format": "json",
     }
     try:
-        resp = requests.post(OLLAMA_URL, json=payload, timeout=15)
+        resp = requests.post(OLLAMA_URL, json=payload, timeout=30)
         resp.raise_for_status()
         raw = resp.json()["response"]
         result = json.loads(raw)
