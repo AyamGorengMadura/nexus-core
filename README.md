@@ -20,6 +20,8 @@ Bagian dari ekosistem: [nexus-docs](../nexus-docs) (arsitektur),
   - [x] Fact Layer — deterministic fact injection per-intent
   - [x] Grounding constraint — narrator no longer fabricates ungrounded claims
   - [x] Full 6-scenario test suite passing (identity, tier, chat, open-ended, combined, system)
+  - [x] Admin Tool (core/admin.py) — kelola trust tier tanpa SQL manual
+  - [x] Fixed: stale camera-detection state (Redis TTL)
   - [ ] Emotion tags (expression/motion) — output ada, belum ada consumer
   - [ ] Cyrene L2D — belum dibangun sama sekali
 - [ ] Phase 4 — Lazarus Guard & Telegram Alert
