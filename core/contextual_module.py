@@ -12,6 +12,38 @@ DB_CONFIG = {
 def get_conn():
     return psycopg2.connect(**DB_CONFIG)
 
+def list_all_persons():
+    """Buat admin tool — liat semua orang yang udah keregister."""
+    conn = get_conn()
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("SELECT id, name, trust_tier, embedding_id FROM persons ORDER BY id")
+        result = cur.fetchall()
+    conn.close()
+    return result
+
+def delete_person(person_id: int, requested_by: str):
+    """
+    Hapus person beserta seluruh interaction_logs miliknya.
+    Sama seperti trust tier, ini WAJIB owner-only — mencegah orang
+    lain menghapus jejak dirinya sendiri dari sistem.
+    """
+    if requested_by != "owner":
+        raise PermissionError("Hanya owner yang boleh menghapus data orang.")
+
+    conn = get_conn()
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("SELECT * FROM persons WHERE id = %s", (person_id,))
+        person = cur.fetchone()
+        if not person:
+            conn.close()
+            return None
+
+        cur.execute("DELETE FROM interaction_logs WHERE person_id = %s", (person_id,))
+        cur.execute("DELETE FROM persons WHERE id = %s", (person_id,))
+    conn.commit()
+    conn.close()
+    return person
+
 def get_person_by_embedding(embedding_id: str):
     conn = get_conn()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:

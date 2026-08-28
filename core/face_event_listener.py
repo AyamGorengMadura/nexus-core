@@ -39,8 +39,8 @@ def listen():
         else:
             print(f"[MATCH] {person['name']} (tier: {person['trust_tier']})")
 
-        r.set("current_detected_person_id", person["id"])
-        r.set("current_detected_person_name", person["name"])
+        r.set("current_detected_person_id", person["id"], ex=10)
+        r.set("current_detected_person_name", person["name"], ex=10)
         log_interaction(person["id"], "Wajah terdeteksi kamera")
 
 
