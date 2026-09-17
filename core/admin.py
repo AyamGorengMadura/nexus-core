@@ -10,7 +10,9 @@ def main():
         print("2. Set trust tier")
         print("3. Hapus orang (by ID)")
         print("4. Bulk hapus semua 'unknown'")
-        print("5. Keluar")
+        print("5. Manual Input Orang")
+        print("6. Ingest dokumen PDF (untuk testing document reader)")
+        print("7. Keluar")
         choice = input("Pilih: ").strip()
 
         if choice == "1":
@@ -81,6 +83,11 @@ def main():
                 print(f"❌ Gagal: {e}")
 
         elif choice == "6":
+            from core.document_reader import ingest_all_pending
+            results = ingest_all_pending(uploaded_by=3)  # sesuaikan ID owner
+            print(f"Selesai. {len(results)} dokumen diproses.")
+
+        elif choice == "7":
             print("Bye.")
             break
 

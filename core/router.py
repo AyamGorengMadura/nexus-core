@@ -2,16 +2,18 @@ import json
 import requests
 import redis
 
+from core.document_reader import search_documents
 from core.fact_layer import get_facts
 from core.contextual_module import (
     build_context_prompt,
     log_interaction,
-    get_person_by_embedding,
     get_conn,
 )
 from core.yuki_framework import narrate
 
 r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+
+DOC_SIMILARITY_THRESHOLD = 0.5 # ini buat rag, klo mau dinaikin ya gpp tapi ntar dia lebih strict milih dokumen yang relevan
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "qwen2.5:3b"
@@ -102,14 +104,34 @@ def route(user_text: str) -> str:
     active_person_id = get_active_person_id()
     log_interaction(active_person_id, f"[{intent}] {user_text}")
 
-    if intent in ("chat", "face_query"):
+    if intent in ("chat", "face_query", "document"):
+        # SELALU coba cari dokumen relevan, apa pun intent-nya
+        doc_results = search_documents(user_text, top_k=3)
+        relevant_docs = [r for r in doc_results if r["similarity"] >= DOC_SIMILARITY_THRESHOLD]
+
         context_prompt = build_context_prompt(active_person_id)
-        facts = get_facts(intent, active_person_id)
+        facts = get_facts(intent, active_person_id) or {}
+
+        if relevant_docs:
+            doc_context = "\n\n".join(f"[{r['filename']}]: {r['content']}" for r in relevant_docs)
+            facts["dokumen_relevan"] = doc_context
+            facts["_instruksi_dokumen"] = "Jawab HANYA berdasarkan isi dokumen di atas. Kalau info tidak ada di dokumen, katakan tidak tahu — jangan mengarang dari pengetahuan umum."
+
         response = narrate(context_prompt, user_text, facts=facts)
         return response["text"]
 
     elif intent == "document":
-        return "[document] event dipublish, nunggu Document Reader"
+        results = search_documents(user_text, top_k=3)
+        if not results:
+            return "Belum ada dokumen yang bisa aku baca. Upload dulu ya."
+
+        doc_context = "\n\n".join(
+            f"[Dari {r['filename']}]: {r['content']}" for r in results
+        )
+        context_prompt = build_context_prompt(active_person_id)
+        facts = {"dokumen_relevan": doc_context}
+        response = narrate(context_prompt, user_text, facts=facts)
+        return response["text"]
 
     elif intent == "system":
         if "status" in user_text.lower() or "cek" in user_text.lower():

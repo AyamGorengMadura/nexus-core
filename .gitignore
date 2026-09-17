@@ -5,3 +5,7 @@ venv/
 .venv/
 *.log
 __pycache__/
+documents/incoming/*
+documents/processed/*
+!documents/incoming/.gitkeep
+!documents/processed/.gitkeep
