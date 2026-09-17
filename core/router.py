@@ -9,7 +9,7 @@ from core.contextual_module import (
     get_person_by_embedding,
     get_conn,
 )
-from core.cyrene_framework import narrate
+from core.yuki_framework import narrate
 
 r = redis.Redis(host="localhost", port=6379, decode_responses=True)
 

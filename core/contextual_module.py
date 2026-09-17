@@ -1,6 +1,8 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from pymupdf import name
+
+
+# ==================== Konfigurasi & koneksi database ====================
 DB_CONFIG = {
     "host": "localhost",
     "port": 5432,
@@ -12,6 +14,8 @@ DB_CONFIG = {
 def get_conn():
     return psycopg2.connect(**DB_CONFIG)
 
+
+# ==================== Operasi data person ====================
 def list_all_persons():
     """Buat admin tool — liat semua orang yang udah keregister."""
     conn = get_conn()
@@ -20,6 +24,46 @@ def list_all_persons():
         result = cur.fetchall()
     conn.close()
     return result
+
+
+def get_person_by_embedding(embedding_id: str):
+    conn = get_conn()
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("SELECT * FROM persons WHERE embedding_id = %s", (embedding_id,))
+        result = cur.fetchone()
+    conn.close()
+    return result
+
+
+def create_unknown_person(embedding_id: str):
+    conn = get_conn()
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            """INSERT INTO persons (name, embedding_id, trust_tier)
+               VALUES (%s, %s, 'unknown') RETURNING *""",
+            ("Unknown", embedding_id)
+        )
+        result = cur.fetchone()
+    conn.commit()
+    conn.close()
+    return result
+
+
+def set_name(person_id: int, name: str, requested_by: str):
+    if requested_by != "owner":
+        raise PermissionError("Hanya owner yang boleh mengubah nama.")
+
+    conn = get_conn()
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            "UPDATE persons SET name = %s WHERE id = %s RETURNING *",
+            (name, person_id)
+        )
+        result = cur.fetchone()
+    conn.commit()
+    conn.close()
+    return result
+
 
 def delete_person(person_id: int, requested_by: str):
     """
@@ -44,26 +88,36 @@ def delete_person(person_id: int, requested_by: str):
     conn.close()
     return person
 
-def get_person_by_embedding(embedding_id: str):
-    conn = get_conn()
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute("SELECT * FROM persons WHERE embedding_id = %s", (embedding_id,))
-        result = cur.fetchone()
-    conn.close()
-    return result
 
-def create_unknown_person(embedding_id: str):
+# ==================== Pengelolaan trust tier ====================
+def bulk_delete_unknown(requested_by: str):
+    """
+    Hapus SEMUA person dengan trust_tier='unknown' beserta interaction_logs-nya.
+    Sengaja dibatasi hanya tier 'unknown' — tidak pernah menyentuh
+    family/guest/owner, biar gak ada resiko kehapus data penting.
+    """
+    if requested_by != "owner":
+        raise PermissionError("Hanya owner yang boleh melakukan bulk delete.")
+
     conn = get_conn()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("SELECT id FROM persons WHERE trust_tier = 'unknown'")
+        ids = [row["id"] for row in cur.fetchall()]
+
+        if not ids:
+            conn.close()
+            return 0
+
         cur.execute(
-            """INSERT INTO persons (name, embedding_id, trust_tier)
-               VALUES (%s, %s, 'unknown') RETURNING *""",
-            ("Unknown", embedding_id)
+            "DELETE FROM interaction_logs WHERE person_id = ANY(%s)", (ids,)
         )
-        result = cur.fetchone()
+        cur.execute(
+            "DELETE FROM persons WHERE trust_tier = 'unknown'"
+        )
     conn.commit()
     conn.close()
-    return result
+    return len(ids)
+
 
 def set_trust_tier(person_id: int, new_tier: str, requested_by: str):
     if requested_by != "owner":
@@ -84,6 +138,8 @@ def set_trust_tier(person_id: int, new_tier: str, requested_by: str):
     conn.close()
     return result
 
+
+# ==================== Riwayat interaksi ====================
 def log_interaction(person_id: int, summary: str):
     conn = get_conn()
     with conn.cursor() as cur:
@@ -93,6 +149,8 @@ def log_interaction(person_id: int, summary: str):
         )
     conn.commit()
     conn.close()
+
+
 def get_recent_interactions(person_id: int, limit: int = 5):
     conn = get_conn()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -107,11 +165,12 @@ def get_recent_interactions(person_id: int, limit: int = 5):
     return result
 
 
+# ==================== Penyusunan context prompt ====================
 def build_context_prompt(person_id: int) -> str:
     """
     Context Injection Pipeline.
     Narik trust tier + riwayat interaksi seseorang, susun jadi
-    system prompt yang siap disuntik ke LLM (Cyrene Framework).
+    system prompt yang siap disuntik ke LLM (yuki Framework).
     """
     conn = get_conn()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -142,7 +201,7 @@ def build_context_prompt(person_id: int) -> str:
     ) if interactions else "Belum ada riwayat interaksi."
 
     # di contextual_module.py, ganti baris terakhir prompt:
-    prompt = f"""Kamu adalah Cyrene, asisten AI yang sedang berbicara dengan: {name}
+    prompt = f"""Kamu adalah yuki, asisten AI yang sedang berbicara dengan: {name}
     Trust tier orang ini: {tier}
     Aturan perilaku: {rule}
 

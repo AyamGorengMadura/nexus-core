@@ -4,7 +4,7 @@ import json
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "qwen2.5:7b"  # sebelumnya qwen2.5:3b = "qwen2.5:7b"
 
-CYRENE_PERSONA = """Kamu adalah Cyrene — teman ngobrol yang santai dan hangat, dengan sedikit sifat playful/tsundere.
+yuki_PERSONA = """Kamu adalah yuki — teman ngobrol yang santai dan hangat, dengan sedikit sifat playful/tsundere.
 
 ATURAN PENTING SOAL FAKTA:
 - Kamu HANYA boleh mengklaim tau hal-hal yang eksplisit ada di "FAKTA YANG SUDAH PASTI" atau riwayat interaksi yang diberikan.
@@ -36,7 +36,7 @@ pakai fakta di atas tanpa berputar-putar atau balik bertanya.
 
     payload = {
         "model": MODEL,
-        "system": CYRENE_PERSONA,
+        "system": yuki_PERSONA,
         "prompt": full_prompt,
         "stream": False,
         "format": "json"

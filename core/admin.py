@@ -1,4 +1,4 @@
-from core.contextual_module import list_all_persons, set_trust_tier, delete_person, bulk_delete_unknown
+from core.contextual_module import list_all_persons, set_name, set_name, set_trust_tier, delete_person, bulk_delete_unknown
 
 VALID_TIERS = {"owner", "family", "guest", "unknown", "blocked"}
 
@@ -72,6 +72,15 @@ def main():
                 print(f"❌ Gagal: {e}")
 
         elif choice == "5":
+            try:
+                pid = int(input("ID orang: "))
+                name = input("Nama baru: ").strip()
+                result = set_name(pid, name, requested_by="owner")
+                print(f"✅ Updated: nama sekarang '{result['name']}'")
+            except Exception as e:
+                print(f"❌ Gagal: {e}")
+
+        elif choice == "6":
             print("Bye.")
             break
 

@@ -2,7 +2,7 @@
 
 Core Orchestrator & Router untuk sistem Nexus/Dozor.
 Bagian dari ekosistem: [nexus-docs](../nexus-docs) (arsitektur), 
-[cyrene](../cyrene) (conversational framework), 
+[yuki](../yuki) (conversational framework), 
 [lazarus-guard](../lazarus-guard) (face verification satellite).
 
 ## Status
@@ -15,13 +15,13 @@ Bagian dari ekosistem: [nexus-docs](../nexus-docs) (arsitektur),
   - [x] Trust tier enforcement (owner-only, `set_trust_tier`)
   - [x] Context Injection Pipeline (`build_context_prompt`)
   - [x] Wired ke router.py (mock `person_id` — nunggu Lazarus Guard di Phase 4)
-- [ ] Phase 3 — Cyrene Framework & Cyrene L2D (WIP)
+- [ ] Phase 3 — Yuki Framework & Yuki L2D (WIP)
   - [x] Narration Layer — Qwen 2.5 7B (narrator), Qwen 2.5 3B (router, split by function)
   - [x] Fact Layer — deterministic fact injection per-intent
   - [x] Grounding constraint — narrator no longer fabricates ungrounded claims
   - [x] Full 6-scenario test suite passing (identity, tier, chat, open-ended, combined, system)
   - [ ] Emotion tags (expression/motion) — output ada, belum ada consumer
-  - [ ] Cyrene L2D — belum dibangun sama sekali
+  - [ ] Yuki L2D — belum dibangun sama sekali
 - [ ] Phase 4 — Lazarus Guard & Telegram Alert
 
 ## Setup
