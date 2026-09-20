@@ -6,7 +6,7 @@
 
 **Central Context Engine & AI Orchestrator for Project Nexus**
 
-Part of [Project Nexus: ](https://github.com/AyamGorengMadura/nexus-docs)
+Part of [Project Nexus ](https://github.com/AyamGorengMadura/nexus-docs)
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Qwen2.5-000000?style=flat-square&logo=ollama&logoColor=white)
