@@ -9,11 +9,11 @@ from core.contextual_module import (
     log_interaction,
     get_conn,
 )
-from core.yuki_framework import narrate
+from core.yuki_framework import narrate, mood_message
 
 r = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
-DOC_SIMILARITY_THRESHOLD = 0.5 # ini buat rag, klo mau dinaikin ya gpp tapi ntar dia lebih strict milih dokumen yang relevan
+DOC_SIMILARITY_THRESHOLD = 0.5
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "qwen2.5:3b"
@@ -94,7 +94,11 @@ def check_system_status() -> str:
     return "\n".join(status)
 
 
-def route(user_text: str) -> str:
+def route(user_text: str) -> dict:
+    """
+    Return mood payload untuk CLI / WebSocket / GUI:
+    {"text": str, "expression": str, "motion": null}
+    """
     classification = classify_intent(user_text)
     intent = classification["intent"]
 
@@ -105,38 +109,31 @@ def route(user_text: str) -> str:
     log_interaction(active_person_id, f"[{intent}] {user_text}")
 
     if intent in ("chat", "face_query", "document"):
-        # SELALU coba cari dokumen relevan, apa pun intent-nya
         doc_results = search_documents(user_text, top_k=3)
-        relevant_docs = [r for r in doc_results if r["similarity"] >= DOC_SIMILARITY_THRESHOLD]
+        relevant_docs = [row for row in doc_results if row["similarity"] >= DOC_SIMILARITY_THRESHOLD]
 
         context_prompt = build_context_prompt(active_person_id)
         facts = get_facts(intent, active_person_id) or {}
 
         if relevant_docs:
-            doc_context = "\n\n".join(f"[{r['filename']}]: {r['content']}" for r in relevant_docs)
+            doc_context = "\n\n".join(
+                f"[{row['filename']}]: {row['content']}" for row in relevant_docs
+            )
             facts["dokumen_relevan"] = doc_context
-            facts["_instruksi_dokumen"] = "Jawab HANYA berdasarkan isi dokumen di atas. Kalau info tidak ada di dokumen, katakan tidak tahu — jangan mengarang dari pengetahuan umum."
+            facts["_instruksi_dokumen"] = (
+                "Jawab HANYA berdasarkan isi dokumen di atas. "
+                "Kalau info tidak ada di dokumen, katakan tidak tahu — "
+                "jangan mengarang dari pengetahuan umum."
+            )
 
-        response = narrate(context_prompt, user_text, facts=facts)
-        return response["text"]
+        return narrate(context_prompt, user_text, facts=facts)
 
-    elif intent == "document":
-        results = search_documents(user_text, top_k=3)
-        if not results:
-            return "Belum ada dokumen yang bisa aku baca. Upload dulu ya."
-
-        doc_context = "\n\n".join(
-            f"[Dari {r['filename']}]: {r['content']}" for r in results
-        )
-        context_prompt = build_context_prompt(active_person_id)
-        facts = {"dokumen_relevan": doc_context}
-        response = narrate(context_prompt, user_text, facts=facts)
-        return response["text"]
-
-    elif intent == "system":
+    if intent == "system":
         if "status" in user_text.lower() or "cek" in user_text.lower():
-            return check_system_status()
-        return "[system] command belum dikenali. Coba 'cek status sistem'."
+            return mood_message(check_system_status(), expression="neutral")
+        return mood_message(
+            "[system] command belum dikenali. Coba 'cek status sistem'.",
+            expression="neutral",
+        )
 
-    else:
-        return f"[unknown intent: {intent}]"
+    return mood_message(f"[unknown intent: {intent}]", expression="neutral")

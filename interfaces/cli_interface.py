@@ -5,9 +5,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from core.router import route
 
 
-
 def main():
-    print("Nexus/Dozor — CLI Interface (Demo)")
+    print("Nexus/Dozor — CLI Interface (Demo / Debug)")
     print("Ketik 'exit' untuk keluar.\n")
 
     while True:
@@ -24,8 +23,11 @@ def main():
             continue
 
         response = route(user_input)
-        print(f"Nexus > {response}\n")
+        text = response.get("text", "") if isinstance(response, dict) else response
+        expression = response.get("expression", "-") if isinstance(response, dict) else "-"
+        print(f"Nexus > {text}")
+        print(f"       [expression={expression} motion={response.get('motion') if isinstance(response, dict) else None}]\n")
+
 
 if __name__ == "__main__":
     main()
-

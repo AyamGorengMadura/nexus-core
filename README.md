@@ -132,15 +132,29 @@ docker exec -it nexus-postgres psql -U postgres -d nexus -f /db_documents.sql
 
 ### 4. Run
 ```bash
+# optional: use project venv
+python3 -m venv .venv
+source .venv/bin/activate          # bash/zsh
+# source .venv/bin/activate.fish   # fish
+pip install -r requirements.txt
+
 # Terminal 1 — listens for Lazarus Guard detections
 python3 -m core.face_event_listener
 
 # Terminal 2 — Lazarus Guard (separate repo)
-python3 main_guard.py
+python3 src/recognition/main_guard.py
 
-# Terminal 3 — chat interface
+# Terminal 3 — WebSocket for Live2D GUI (returns {text, expression, motion})
+python3 interfaces/ws_interface.py
+
+# Terminal 4 — GUI
+# cd ../nexus-gui && npm install && npm run dev
+
+# Debug / admin chat (CLI tetap ada)
 python3 interfaces/cli_interface.py
 ```
+
+`route()` sekarang return dict mood JSON (bukan string). CLI tetap print `text`; GUI consume `expression` buat avatar.
 
 ## 🔌 Integrations
 
