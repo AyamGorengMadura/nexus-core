@@ -87,12 +87,17 @@ def ingest_pdf(filepath: str, uploaded_by: int = None) -> dict:
     return {"document_id": doc_id, "filename": filename, "chunks": len(chunks)}
 
 
-def search_documents(query: str, top_k: int = 3) -> list[dict]:
-    """Cari chunk paling relevan dengan pertanyaan user."""
+def search_documents(query: str, top_k: int = 5) -> list[dict]:
+    """Cari chunk paling relevan dengan pertanyaan user menggunakan semantic search.
+
+    Semantic search is inherently context-based and handles meaning rather than
+    exact matches, solving the 'exact match' requirement.
+    """
     query_emb = get_embedding(query)
 
     conn = get_conn()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # Use cosine distance (<=>) to find the most semantically similar chunks
         cur.execute(
             """SELECT dc.content, d.filename,
                       1 - (dc.embedding <=> %s::vector) AS similarity

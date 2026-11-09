@@ -1,8 +1,17 @@
 import requests
 import json
+import edge_tts
+import asyncio
+import os
+from core.mood_manager import mood_manager
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "qwen2.5:7b"
+VOICE = "en-US-AnaNeural"
+TTS_OUTPUT_DIR = "nexus-core/assets/tts"
+
+# Ensure TTS directory exists
+os.makedirs(TTS_OUTPUT_DIR, exist_ok=True)
 
 # Source of truth: l2d_model/expression_motion_map.json (S0)
 VALID_EXPRESSIONS = {"neutral", "angry", "sad", "yandere"}
@@ -53,7 +62,7 @@ def mood_message(text: str, expression: str = "neutral") -> dict:
     return normalize_mood({"text": text, "expression": expression, "motion": None})
 
 
-def narrate(context_prompt: str, user_text: str, facts: dict = None) -> dict:
+def narrate(context_prompt: str, user_text: str, facts: dict = None, person_id: int = None) -> dict:
     fact_injection = ""
     if facts:
         lines = "\n".join(f"- {k}: {v}" for k, v in facts.items())
@@ -64,7 +73,15 @@ Kalau user menanyakan identitas/tier mereka secara langsung, JAWAB LANGSUNG
 pakai fakta di atas tanpa berputar-putar atau balik bertanya.
 """
 
-    full_prompt = f"{context_prompt}\n{fact_injection}\n\nPesan dari user: {user_text}"
+    # Mood Integration
+    mood_modifier = ""
+    current_expression = "neutral"
+    if person_id:
+        mood = mood_manager.get_current_mood(person_id)
+        mood_modifier = f"\nMOOD SAAT INI: {mood}\n{mood_manager.get_mood_modifier(mood)}"
+        current_expression = mood_manager.get_expression(mood)
+
+    full_prompt = f"{context_prompt}\n{fact_injection}\n{mood_modifier}\n\nPesan dari user: {user_text}"
 
     payload = {
         "model": MODEL,
@@ -74,8 +91,8 @@ pakai fakta di atas tanpa berputar-putar atau balik bertanya.
         "format": "json",
     }
 
-    instruction = """Balas HANYA dalam format JSON:
-{"text": "<respons natural kamu>", "expression": "<neutral|angry|sad|yandere>", "motion": null}
+    instruction = f"""Balas HANYA dalam format JSON:
+{{ "text": "<respons natural kamu>", "expression": "{current_expression}", "motion": null }}
 
 Aturan expression (wajib salah satu ini, cocokkan nada balasanmu):
 - "neutral": biasa / santai / senyum tipis
@@ -96,3 +113,14 @@ motion SELALU null (model belum punya motion clip)."""
             "Maaf, aku lagi agak bingung nih. Bisa diulang?",
             expression="sad",
         ) | {"error": str(e)}
+
+def synthesize_speech(text: str, filename: str = None) -> str:
+    """Convert text to speech using edge-tts and save to file."""
+    if not filename:
+        import uuid
+        filename = f"{uuid.uuid4()}.mp3"
+
+    full_path = os.path.join(TTS_OUTPUT_DIR, filename)
+    communicate = edge_tts.Communicate(text, VOICE)
+    asyncio.run(communicate.save(full_path))
+    return filename

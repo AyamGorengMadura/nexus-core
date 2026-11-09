@@ -19,16 +19,41 @@ def watch_for_quit():
             os._exit(0)
 
 
+PROACTIVE_PERSON_COOLDOWN = 300   # per orang dikenal, 5 menit
+PROACTIVE_GLOBAL_GAP = 60         # jeda minimum antar sapaan APA PUN
+
+
+def _is_recognized(person: dict) -> bool:
+    return not str(person.get("embedding_id") or "").startswith("unknown_")
+
+
 def publish_proactive(person: dict, is_new: bool):
-    """Minta ws_interface (kalau hidup) supaya Yuki nyapa duluan."""
+    recognized = _is_recognized(person)
+    # semua unknown berbagi satu slot, bukan per-ID (tiap flicker bikin ID baru)
+    who = f"person:{person.get('id')}" if recognized else "unknown"
+
+    # unknown yang muncul sesaat setelah orang dikenal disapa = hampir pasti flicker
+    if not recognized and r.exists("greeted_recently:known"):
+        return
+
+    # Cek cooldown per person dan gap global
+    if r.exists(f"greeted:{who}") or r.exists("greet:global_gap"):
+        return
+
+    r.set(f"greeted:{who}", "1", ex=PROACTIVE_PERSON_COOLDOWN)
+    r.set("greet:global_gap", "1", ex=PROACTIVE_GLOBAL_GAP)
+    if recognized:
+        r.set("greeted_recently:known", "1", ex=PROACTIVE_PERSON_COOLDOWN)
+
     payload = {
-        "person_id": person["id"],
-        "name": person["name"],
+        "name": person.get("name", "Unknown"),
+        "person_id": person.get("id"),
         "trust_tier": person.get("trust_tier", "unknown"),
-        "event": "face_new" if is_new else "face_changed",
+        "is_new": is_new,
+        "recognized": recognized,
     }
     r.publish("proactive-speech", json.dumps(payload))
-    print(f"[PROACTIVE] published for {person['name']} ({payload['event']})")
+    print(f"[PROACTIVE] published for {payload['name']} (is_new={is_new})")
 
 
 def listen():
@@ -60,7 +85,10 @@ def listen():
         r.set("current_detected_person_name", person["name"], ex=10)
         log_interaction(person["id"], "Wajah terdeteksi kamera")
 
+        # Session Lock: Remember identity until it's gone for a while
         identity_key = str(person["id"])
+
+        # If identity changes, update the last known identity and trigger proactive
         if identity_key != _last_proactive_identity:
             _last_proactive_identity = identity_key
             publish_proactive(person, is_new=is_new)

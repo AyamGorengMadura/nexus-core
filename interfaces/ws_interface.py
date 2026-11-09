@@ -17,28 +17,100 @@ import json
 import sys
 import os
 import threading
+import random
+import redis
+from http.server import SimpleHTTPRequestHandler
+from socketserver import TCPServer
+from websockets.server import serve
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-import redis
-from websockets.asyncio.server import serve
-
 from core.router import route
 from core.contextual_module import build_context_prompt
-from core.yuki_framework import narrate, mood_message
+from core.yuki_framework import narrate, mood_message, synthesize_speech
+from core.system_monitor import SystemMonitor
 
-HOST = "0.0.0.0"
-PORT = 8765
-PROACTIVE_CHANNEL = "proactive-speech"
 
-r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+
+from core.logger import get_logger
+from config import (
+    WS_HOST, WS_PORT, AUDIO_PORT, REDIS_HOST, REDIS_PORT,
+    PROACTIVE_CHANNEL, TTS_OUTPUT_DIR
+)
+
+logger = get_logger("ws_interface")
+
+def log(msg):
+    logger.info(msg)
+
+def start_audio_server():
+    """Jalanin HTTP server buat serve file .mp3 dari assets/tts."""
+    # Tentukan folder assets/tts absolut
+    base_dir = TTS_OUTPUT_DIR
+
+    class AudioHandler(SimpleHTTPRequestHandler):
+        def translate_path(self, path):
+            # Map /audio/uuid.mp3 -> assets/tts/uuid.mp3
+            if path.startswith("/audio/"):
+                return os.path.join(base_dir, path[7:])
+            return super().translate_path(path)
+
+    # Jalankan di port 8000
+    httpd = TCPServer(("0.0.0.0", AUDIO_PORT), AudioHandler)
+    log("[HTTP] Audio server started on port 8000")
+    httpd.serve_forever()
+
+HOST = WS_HOST
+PORT = WS_PORT
+PROACTIVE_CHANNEL = PROACTIVE_CHANNEL
+
+
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
 clients: set = set()
 proactive_queue: asyncio.Queue | None = None
 
 
-def log(msg: str) -> None:
-    print(msg, flush=True)
+GREETINGS = {
+    "owner": [
+        ("Oh, {name}. Akhirnya muncul juga.", "neutral"),
+        ("Hmph, telat. Tapi ya udah, selamat datang, {name}.", "angry"),
+        ("Hai {name}! Aku standby dari tadi.", "neutral"),
+    ],
+    "known": [
+        ("Hai {name}, selamat datang.", "neutral"),
+        ("Oh, ada {name}. Halo!", "neutral"),
+    ],
+    "stranger": [
+        ("Hai, aku Yuki. Kamu siapa ya?", "neutral"),
+        ("Halo, belum kenal nih. Siapa namamu?", "neutral"),
+    ],
+}
+
+
+def greeting_for(event: dict) -> dict:
+    name = event.get("name") or "kamu"
+    recognized = event.get("recognized", name != "Unknown")
+    if not recognized:
+        pool = GREETINGS["stranger"]
+    elif event.get("trust_tier") == "owner":
+        pool = GREETINGS["owner"]
+    else:
+        pool = GREETINGS["known"]
+    text, expr = random.choice(pool)
+    return mood_message(text.format(name=name), expression=expr)
+
+
+def listen_for_exit():
+    """Thread terpisah untuk mendengarkan input terminal. 'q' untuk stop."""
+    while True:
+        try:
+            char = sys.stdin.read(1)
+            if char.lower() == 'q':
+                log("\n[WS] Killswitch triggered! Stopping server...")
+                os._exit(0)
+        except EOFError:
+            break
 
 
 def _redis_subscriber(loop: asyncio.AbstractEventLoop):
@@ -75,36 +147,30 @@ async def broadcast(payload: dict):
 
 
 async def handle_proactive_events():
-    """Ambil event face dari queue, generate ucapan Yuki, push ke semua GUI."""
+    """Ambil event face dari queue, gunakan greeting pre-baked untuk hemat resource Ollama."""
     global proactive_queue
     proactive_queue = asyncio.Queue()
     while True:
         event = await proactive_queue.get()
-        name = event.get("name", "seseorang")
-        person_id = event.get("person_id")
-        tier = event.get("trust_tier", "unknown")
 
-        try:
-            context = build_context_prompt(int(person_id)) if person_id else ""
-            facts = {"name": name, "trust_tier": tier}
-            mood = narrate(
-                context,
-                (
-                    f"[sistem: {name} baru terdeteksi di depan kamera "
-                    f"(tier: {tier}). Sambut mereka secara natural, singkat.]"
-                ),
-                facts=facts,
-            )
-        except Exception as e:
-            mood = mood_message(f"Oh, hai {name}!", expression="neutral")
-            mood["error"] = str(e)
+        # Handle system alerts directly, bypass greeting_for
+        if event.get("type") == "system_alert":
+            text = event.get("text", "Sistem ada masalah!")
+            expr = event.get("expression", "angry")
+        else:
+            mood = greeting_for(event)
+            text = mood["text"]
+            expr = mood["expression"]
 
+        # TTS Generation for proactive
+        audio_file = await asyncio.to_thread(synthesize_speech, text)
         await broadcast(
             {
                 "type": "proactive",
-                "text": mood["text"],
-                "expression": mood["expression"],
-                "motion": mood.get("motion"),
+                "text": text,
+                "expression": expr,
+                "motion": None,
+                "audio": audio_file,
             }
         )
 
@@ -147,7 +213,17 @@ async def handle_client(websocket):
             if not text:
                 continue
 
-            mood = await asyncio.to_thread(route, text)
+            try:
+                mood = await asyncio.to_thread(route, text)
+                # TTS Generation
+                audio_file = await asyncio.to_thread(synthesize_speech, mood["text"])
+            except Exception as e:
+                log(f"[WS] route()/tts error: {e}")
+                mood = mood_message(
+                    "Maaf, ada error di backend. Cek log nexus.", expression="sad"
+                )
+                audio_file = None
+
             await websocket.send(
                 json.dumps(
                     {
@@ -155,6 +231,7 @@ async def handle_client(websocket):
                         "text": mood["text"],
                         "expression": mood["expression"],
                         "motion": mood.get("motion"),
+                        "audio": audio_file,
                     },
                     ensure_ascii=False,
                 )
@@ -173,7 +250,26 @@ async def main():
 
     loop = asyncio.get_running_loop()
     threading.Thread(target=_redis_subscriber, args=(loop,), daemon=True).start()
+    threading.Thread(target=listen_for_exit, daemon=True).start()
+    threading.Thread(target=start_audio_server, daemon=True).start()
     asyncio.create_task(handle_proactive_events())
+
+    # System Monitor Integration
+    def on_system_alert(alert_text):
+        # Publish alert to Redis so handle_proactive_events can pick it up and broadcast
+        # We wrap it in a format that greeting_for or handle_proactive_events can handle
+        # Since greeting_for expects an event with name/trust_tier, we'll bypass it
+        # and send a direct proactive message.
+        log(f"[SystemMonitor] Alert: {alert_text}")
+        # We push to Redis to keep it consistent with the proactive flow
+        r.publish(PROACTIVE_CHANNEL, json.dumps({
+            "type": "system_alert",
+            "text": alert_text,
+            "expression": "angry"
+        }))
+
+    monitor = SystemMonitor()
+    monitor.start(on_system_alert)
 
     log(f"[WS] starting on ws://{HOST}:{PORT} ...")
     async with serve(handle_client, HOST, PORT) as server:
